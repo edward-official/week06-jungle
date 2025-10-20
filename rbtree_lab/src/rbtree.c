@@ -3,13 +3,32 @@
 
 rbtree *new_rbtree(void) {
   rbtree *p = (rbtree *)calloc(1, sizeof(rbtree));
-  p->root = NULL;
-  p->nil->color = RBTREE_BLACK;
+  if(!p) return NULL;
+  // Allocate sentinel
+  node_t *sentinel = (node_t *)calloc(1, sizeof(node_t));
+  if(!sentinel) {
+    free(p);
+    return NULL;
+  }
+  sentinel->color  = RBTREE_BLACK;
+  sentinel->left   = sentinel;
+  sentinel->right  = sentinel;
+  sentinel->parent = sentinel;
+  p->nil  = sentinel;
+  p->root = sentinel;
   return p;
 }
 
+void _free_rbtree(node_t *node, node_t *sentinel) {
+  if(!node || node == sentinel) return;
+  _free_rbtree(node->left, sentinel);
+  _free_rbtree(node->right, sentinel);
+  free(node);
+}
+
 void delete_rbtree(rbtree *t) {
-  // TODO: reclaim the tree nodes's memory
+  _free_rbtree(t->root, t->nil);
+  free(t->nil);
   free(t);
 }
 
@@ -98,15 +117,17 @@ void fixup(rbtree *t, node_t *redNode) {
 node_t* rbtree_insert(rbtree *t, const key_t key) {
   // Generating node to append
   node_t *appendingNode = calloc(1, sizeof(node_t));
+  if(!appendingNode) return NULL;
   appendingNode->color = RBTREE_RED;
   appendingNode->key = key;
   appendingNode->left = t->nil;
   appendingNode->right = t->nil;
   appendingNode->parent = t->nil;
   // If tree is empty, just place it on the root
-  if(!t->root) {
+  if(t->root == t->nil) {
     t->root = appendingNode;
-    return t->root;
+    t->root->color = RBTREE_BLACK;
+    return appendingNode;
   }
   // If tree is not empty, append on the proper place
   node_t *traverse = t->root;
@@ -119,33 +140,35 @@ node_t* rbtree_insert(rbtree *t, const key_t key) {
   }
   // Append under the place we found
   appendingNode->parent = parent;
-  if(key < traverse->key) parent->left = appendingNode;
+  if(key < parent->key) parent->left = appendingNode;
   else parent->right = appendingNode;
   // Fix up the tree
-  return t->root;
+  fixup(t, appendingNode);
+  return appendingNode;
 }
 
 node_t* rbtree_find(const rbtree *t, const key_t key) {
-  if(!t->root) return NULL;
+  if(t->root == t->nil) return NULL;
   node_t *traverse = t->root;
-  while(traverse) {
-    if(key == traverse->key) return traverse;
+  while(traverse != t->nil) {
+    if(key == traverse->key) break;;
     if(key < traverse->key) traverse = traverse->left;
     else traverse = traverse->right;
   }
+  return traverse;
 }
 
 node_t *rbtree_min(const rbtree *t) {
   if(!t->root) return NULL;
   node_t *traverse = t->root;
-  while(traverse->left) traverse = traverse->left;
+  while(traverse->left != t->nil) traverse = traverse->left;
   return traverse;
 }
 
 node_t *rbtree_max(const rbtree *t) {
   if(!t->root) return NULL;
   node_t *traverse = t->root;
-  while(traverse->right) traverse = traverse->right;
+  while(traverse->right != t->nil) traverse = traverse->right;
   return traverse;
 }
 
@@ -154,7 +177,19 @@ int rbtree_erase(rbtree *t, node_t *p) {
   return 0;
 }
 
+static void inorder_to_array(const rbtree *t, const node_t *x, key_t *arr, const size_t n, size_t *idx) {
+  if (x == t->nil || *idx >= n) return;
+  inorder_to_array(t, x->left, arr, n, idx);
+  if (*idx < n) {
+    arr[*idx] = x->key;
+    (*idx)++;
+  }
+  inorder_to_array(t, x->right, arr, n, idx);
+}
+
 int rbtree_to_array(const rbtree *t, key_t *arr, const size_t n) {
-  // TODO: implement to_array
-  return 0;
+  if (t == NULL || arr == NULL || n == 0) return 0;
+  size_t idx = 0;
+  inorder_to_array(t, t->root, arr, n, &idx);
+  return (int)idx;
 }
