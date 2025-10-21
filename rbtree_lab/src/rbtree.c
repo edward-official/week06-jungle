@@ -184,63 +184,65 @@ node_t *tree_minimum(const rbtree *t, node_t *p) {
   return p;
 }
 
-void rbtree_delete_fixup(rbtree *t, node_t *errorNode) {
-  while (errorNode != t->root && errorNode->color == RBTREE_BLACK) {
-    if(errorNode == errorNode->parent->left) {
-      node_t *sibling = errorNode->parent->right;
+void rbtree_delete_fixup(rbtree *t, node_t *doubleBlack) {
+  while(doubleBlack != t->root && doubleBlack->color == RBTREE_BLACK) {
+    // Case 1: doubleBlack is left-child.
+    if(doubleBlack == doubleBlack->parent->left) {
+      node_t *sibling = doubleBlack->parent->right;
       if(sibling->color == RBTREE_RED) {
         sibling->color = RBTREE_BLACK;
-        errorNode->parent->color = RBTREE_RED;
-        rotateLeft(t, errorNode->parent);
-        sibling = errorNode->parent->right;
+        doubleBlack->parent->color = RBTREE_RED;
+        rotateLeft(t, doubleBlack->parent);
+        sibling = doubleBlack->parent->right;
       }
       if(sibling->left->color == RBTREE_BLACK && sibling->right->color == RBTREE_BLACK) {
         sibling->color = RBTREE_RED;
-        errorNode = errorNode->parent;
+        doubleBlack = doubleBlack->parent;
       }
       else {
         if(sibling->right->color == RBTREE_BLACK) {
           sibling->left->color = RBTREE_BLACK;
           sibling->color = RBTREE_RED;
           rotateRight(t, sibling);
-          sibling = errorNode->parent->right;
+          sibling = doubleBlack->parent->right;
         }
-        sibling->color = errorNode->parent->color;
-        errorNode->parent->color = RBTREE_BLACK;
+        sibling->color = doubleBlack->parent->color;
+        doubleBlack->parent->color = RBTREE_BLACK;
         sibling->right->color = RBTREE_BLACK;
-        rotateLeft(t, errorNode->parent);
-        errorNode = t->root;
+        rotateLeft(t, doubleBlack->parent);
+        doubleBlack = t->root;
       }
     }
+    // Case 2: doubleBlack is right-child.
     else {
-      node_t *sibling = errorNode->parent->left;
+      node_t *sibling = doubleBlack->parent->left;
       if(sibling->color == RBTREE_RED) {
         sibling->color = RBTREE_BLACK;
-        errorNode->parent->color = RBTREE_RED;
-        rotateRight(t, errorNode->parent);
-        sibling = errorNode->parent->left;
+        doubleBlack->parent->color = RBTREE_RED;
+        rotateRight(t, doubleBlack->parent);
+        sibling = doubleBlack->parent->left;
       }
       if(sibling->right->color == RBTREE_BLACK && sibling->left->color == RBTREE_BLACK) {
         sibling->color = RBTREE_RED;
-        errorNode = errorNode->parent;
+        doubleBlack = doubleBlack->parent;
       }
       else {
         if(sibling->left->color == RBTREE_BLACK) {
           sibling->right->color = RBTREE_BLACK;
           sibling->color = RBTREE_RED;
           rotateLeft(t, sibling);
-          sibling = errorNode->parent->left;
+          sibling = doubleBlack->parent->left;
         }
-        sibling->color = errorNode->parent->color;
-        errorNode->parent->color = RBTREE_BLACK;
+        sibling->color = doubleBlack->parent->color;
+        doubleBlack->parent->color = RBTREE_BLACK;
         sibling->left->color = RBTREE_BLACK;
-        rotateRight(t, errorNode->parent);
-        errorNode = t->root;
+        rotateRight(t, doubleBlack->parent);
+        doubleBlack = t->root;
       }
     }
   }
   // Exited loop, Update Color
-  errorNode->color = RBTREE_BLACK;
+  doubleBlack->color = RBTREE_BLACK;
 }
 
 int rbtree_erase(rbtree *t, node_t *deletingNode) {
