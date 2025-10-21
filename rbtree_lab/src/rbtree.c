@@ -50,11 +50,11 @@ void rotateRight(rbtree *t, node_t *pRight) {
   node_t *pLeft = pRight->left;
   // Need to move right-tree of pLeft to the left-tree of pRight
   pRight->left = pLeft->right;
-  if (pLeft->right != t->nil) pLeft->right->parent = pRight;
+  if(pLeft->right != t->nil) pLeft->right->parent = pRight;
   // Conduct rotation
   pLeft->parent = pRight->parent;
-  if (pRight->parent == t->nil) t->root = pLeft;
-  else if (pRight == pRight->parent->left) pRight->parent->left = pLeft;
+  if(pRight->parent == t->nil) t->root = pLeft;
+  else if(pRight == pRight->parent->left) pRight->parent->left = pLeft;
   else pRight->parent->right = pLeft;
   pLeft->right = pRight;
   pRight->parent = pLeft;
@@ -91,7 +91,7 @@ void fixup(rbtree *t, node_t *redNode) {
     else {
       uncle = redNode->parent->parent->left;
       // Case 2-1: Uncle is also RED
-      if (uncle->color == RBTREE_RED) {
+      if(uncle->color == RBTREE_RED) {
         redNode->parent->color = RBTREE_BLACK;
         uncle->color = RBTREE_BLACK;
         redNode->parent->parent->color = RBTREE_RED;
@@ -99,7 +99,7 @@ void fixup(rbtree *t, node_t *redNode) {
       }
       else {
         // CASE 2-2: Uncle is BLACK and redNode is left-child
-        if (redNode == redNode->parent->left) {
+        if(redNode == redNode->parent->left) {
           // Need to update redNode due to the rotation
           redNode = redNode->parent;
           rotateRight(t, redNode);
@@ -151,11 +151,11 @@ node_t* rbtree_find(const rbtree *t, const key_t key) {
   if(t->root == t->nil) return NULL;
   node_t *traverse = t->root;
   while(traverse != t->nil) {
-    if(key == traverse->key) break;;
+    if(key == traverse->key) return traverse;
     if(key < traverse->key) traverse = traverse->left;
     else traverse = traverse->right;
   }
-  return traverse;
+  return NULL;
 }
 
 node_t *rbtree_min(const rbtree *t) {
@@ -172,15 +172,115 @@ node_t *rbtree_max(const rbtree *t) {
   return traverse;
 }
 
-int rbtree_erase(rbtree *t, node_t *p) {
-  // TODO: implement erase
+void rbtree_transplant(rbtree *t, node_t *p1, node_t *p2) {
+  if(p1->parent == t->nil) t->root = p2;
+  else if(p1 == p1->parent->left) p1->parent->left = p2;
+  else p1->parent->right = p2;
+  p2->parent = p1->parent;
+}
+
+node_t *tree_minimum(const rbtree *t, node_t *p) {
+  while(p->left != t->nil) p = p->left;
+  return p;
+}
+
+void rbtree_delete_fixup(rbtree *t, node_t *errorNode) {
+  while (errorNode != t->root && errorNode->color == RBTREE_BLACK) {
+    if(errorNode == errorNode->parent->left) {
+      node_t *sibling = errorNode->parent->right;
+      if(sibling->color == RBTREE_RED) {
+        sibling->color = RBTREE_BLACK;
+        errorNode->parent->color = RBTREE_RED;
+        rotateLeft(t, errorNode->parent);
+        sibling = errorNode->parent->right;
+      }
+      if(sibling->left->color == RBTREE_BLACK && sibling->right->color == RBTREE_BLACK) {
+        sibling->color = RBTREE_RED;
+        errorNode = errorNode->parent;
+      }
+      else {
+        if(sibling->right->color == RBTREE_BLACK) {
+          sibling->left->color = RBTREE_BLACK;
+          sibling->color = RBTREE_RED;
+          rotateRight(t, sibling);
+          sibling = errorNode->parent->right;
+        }
+        sibling->color = errorNode->parent->color;
+        errorNode->parent->color = RBTREE_BLACK;
+        sibling->right->color = RBTREE_BLACK;
+        rotateLeft(t, errorNode->parent);
+        errorNode = t->root;
+      }
+    }
+    else {
+      node_t *sibling = errorNode->parent->left;
+      if(sibling->color == RBTREE_RED) {
+        sibling->color = RBTREE_BLACK;
+        errorNode->parent->color = RBTREE_RED;
+        rotateRight(t, errorNode->parent);
+        sibling = errorNode->parent->left;
+      }
+      if(sibling->right->color == RBTREE_BLACK && sibling->left->color == RBTREE_BLACK) {
+        sibling->color = RBTREE_RED;
+        errorNode = errorNode->parent;
+      }
+      else {
+        if(sibling->left->color == RBTREE_BLACK) {
+          sibling->right->color = RBTREE_BLACK;
+          sibling->color = RBTREE_RED;
+          rotateLeft(t, sibling);
+          sibling = errorNode->parent->left;
+        }
+        sibling->color = errorNode->parent->color;
+        errorNode->parent->color = RBTREE_BLACK;
+        sibling->left->color = RBTREE_BLACK;
+        rotateRight(t, errorNode->parent);
+        errorNode = t->root;
+      }
+    }
+  }
+  // Exited loop, Update Color
+  errorNode->color = RBTREE_BLACK;
+}
+
+int rbtree_erase(rbtree *t, node_t *deletingNode) {
+  node_t *successor = deletingNode, *rightChildOfSuccessor;
+  color_t removedColor = deletingNode->color;
+  // Case 1: One or less child from deletingNode
+  if(deletingNode->left == t->nil) {
+    rightChildOfSuccessor = deletingNode->right;
+    rbtree_transplant(t, deletingNode, deletingNode->right);
+  }
+  // Case 1: One or less child from deletingNode
+  else if(deletingNode->right == t->nil) {
+    rightChildOfSuccessor = deletingNode->left;
+    rbtree_transplant(t, deletingNode, deletingNode->left);
+  }
+  // Case 2: Two children from deletingNode
+  else {
+    successor = tree_minimum(t, deletingNode->right);
+    removedColor = successor->color;
+    rightChildOfSuccessor = successor->right;
+    // Replace successor with it's right sub-tree. (Left sub-tree doesn't exist.)
+    rbtree_transplant(t, successor, successor->right);
+    // Replace deletingNode with rightChildOfSuccessor
+    successor->right = deletingNode->right;
+    successor->right->parent = successor;
+    // Complete the replacement.
+    rbtree_transplant(t, deletingNode, successor);
+    successor->left = deletingNode->left;
+    successor->left->parent = successor;
+    successor->color = deletingNode->color;
+  }
+  if(removedColor == RBTREE_BLACK) rbtree_delete_fixup(t, rightChildOfSuccessor);
+  free(deletingNode);
   return 0;
 }
 
 static void inorder_to_array(const rbtree *t, const node_t *x, key_t *arr, const size_t n, size_t *idx) {
-  if (x == t->nil || *idx >= n) return;
+  if(x == t->nil || *idx >= n) return;
   inorder_to_array(t, x->left, arr, n, idx);
-  if (*idx < n) {
+  if(*idx < n) {
     arr[*idx] = x->key;
     (*idx)++;
   }
@@ -188,7 +288,7 @@ static void inorder_to_array(const rbtree *t, const node_t *x, key_t *arr, const
 }
 
 int rbtree_to_array(const rbtree *t, key_t *arr, const size_t n) {
-  if (t == NULL || arr == NULL || n == 0) return 0;
+  if(t == NULL || arr == NULL || n == 0) return 0;
   size_t idx = 0;
   inorder_to_array(t, t->root, arr, n, &idx);
   return (int)idx;
